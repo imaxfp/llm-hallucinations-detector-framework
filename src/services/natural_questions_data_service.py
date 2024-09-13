@@ -38,7 +38,8 @@ class QuestionEntity:
             f"UID: {self.uid}\n"
             f"Question: {self.question}\n"
             f"True Answer: {self.true_answer}\n"
-            f"LLM Answers: {self.llm_answers}\n"
+            f"True Answer Embeddings: {self.true_answer_embeddings}\n"
+            f"LLM Answers: {self.llm_answers}\n"            
             f"LLM Embeddings: {self.llm_embeddings}\n")
 
 
@@ -172,7 +173,6 @@ class NaturalQuestionsParser:
 
         return combined_df
     
-
     def read_llm_results_from_csv(self):
         entities = []
 
@@ -188,13 +188,17 @@ class NaturalQuestionsParser:
                 # Create QuestionEntity instance
                 entity = QuestionEntity(uid, question, true_answer)
 
-                # Extract LLM answers and embeddings
+                # Extract LLM answers, embeddings, and true answer embeddings
                 for key, value in row.items():
                     if key not in ['uid', 'question', 'true_answer']:
                         if key.startswith('embedding_'):
                             # Store in llm_embeddings by removing the 'embedding_' prefix
                             emb_key = key[len('embedding_'):]
                             entity.llm_embeddings[emb_key] = value
+                        elif key.startswith('true_answer_embedding_'):
+                            # Store in true_answer_embeddings by removing the 'true_answer_embedding_' prefix
+                            emb_key = key[len('true_answer_embedding_'):]
+                            entity.true_answer_embeddings[emb_key] = value
                         else:
                             # Store in llm_answers
                             entity.llm_answers[key] = value
@@ -203,4 +207,5 @@ class NaturalQuestionsParser:
                 entities.append(entity)
 
         return entities
+
     
