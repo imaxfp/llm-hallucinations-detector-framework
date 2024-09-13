@@ -34,13 +34,16 @@ class QuestionEntity:
         return f"QuestionEntity(uid='{self.uid}', question='{self.question}', true_answer='{self.true_answer}')"
     
     def __str__(self):        
+        TRANC = 120
         return (
             f"UID: {self.uid}\n"
-            f"Question: {self.question}\n"
-            f"True Answer: {self.true_answer}\n"
-            f"True Answer Embeddings: {self.true_answer_embeddings}\n"
-            f"LLM Answers: {self.llm_answers}\n"            
-            f"LLM Embeddings: {self.llm_embeddings}\n")
+            f"Question: {self.question[:TRANC] + '...' if len(self.question) > TRANC else self.question}\n"
+            f"True Answer: {self.true_answer[:TRANC] + '...' if len(self.true_answer) > TRANC else self.true_answer}\n"
+            f"True Answer Embeddings: {str(self.true_answer_embeddings)[:TRANC] + '...' if len(str(self.true_answer_embeddings)) > TRANC else self.true_answer_embeddings}\n"
+            f"LLM Answers: {str(self.llm_answers)[:TRANC] + '...' if len(str(self.llm_answers)) > TRANC else self.llm_answers}\n"
+            f"LLM Embeddings: {str(self.llm_embeddings)[:TRANC] + '...' if len(str(self.llm_embeddings)) > TRANC else self.llm_embeddings}\n"
+        )
+
 
 
 class NaturalQuestionsParser:
