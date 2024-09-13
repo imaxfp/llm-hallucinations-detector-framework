@@ -33,7 +33,7 @@ class QuestionEntity:
     def __repr__(self):        
         return f"QuestionEntity(uid='{self.uid}', question='{self.question}', true_answer='{self.true_answer}')"
     
-    def truncate(self, text, length=120):
+    def truncate(self, text, length=80):
         """Truncate text to the specified length with '...' if needed."""
         return text[:length] + '...' if len(text) > length else text
 
