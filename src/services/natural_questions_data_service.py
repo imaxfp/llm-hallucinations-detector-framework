@@ -33,18 +33,19 @@ class QuestionEntity:
     def __repr__(self):        
         return f"QuestionEntity(uid='{self.uid}', question='{self.question}', true_answer='{self.true_answer}')"
     
-    def __str__(self):        
-        TRANC = 120
+    def truncate(self, text, length=120):
+        """Truncate text to the specified length with '...' if needed."""
+        return text[:length] + '...' if len(text) > length else text
+
+    def __str__(self):
         return (
             f"UID: {self.uid}\n"
-            f"Question: {self.question[:TRANC] + '...' if len(self.question) > TRANC else self.question}\n"
-            f"True Answer: {self.true_answer[:TRANC] + '...' if len(self.true_answer) > TRANC else self.true_answer}\n"
-            f"True Answer Embeddings: {str(self.true_answer_embeddings)[:TRANC] + '...' if len(str(self.true_answer_embeddings)) > TRANC else self.true_answer_embeddings}\n"
-            f"LLM Answers: {str(self.llm_answers)[:TRANC] + '...' if len(str(self.llm_answers)) > TRANC else self.llm_answers}\n"
-            f"LLM Embeddings: {str(self.llm_embeddings)[:TRANC] + '...' if len(str(self.llm_embeddings)) > TRANC else self.llm_embeddings}\n"
+            f"Question: {self.truncate(self.question)}\n"
+            f"True Answer: {self.truncate(self.true_answer)}\n"
+            f"True Answer Embeddings: {self.truncate(str(self.true_answer_embeddings))}\n"
+            f"LLM Answers: {self.truncate(str(self.llm_answers))}\n"
+            f"LLM Embeddings: {self.truncate(str(self.llm_embeddings))}\n"
         )
-
-
 
 class NaturalQuestionsParser:
     def __init__(self, file_path):
