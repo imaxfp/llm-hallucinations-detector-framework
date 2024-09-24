@@ -6,6 +6,13 @@ TODO add description
 - source ./venv/bin/activate
 - pip3 install -r requirements.txt
 
+#### for the large files support
+git lfs install
+git lfs ls-files
+git add path/to/your/largefile.zip
+git commit -m "Track large file with LFS"
+git push origin main
+
 
 ```
 Make sure to update your transformers installation via pip install --upgrade transformers.
