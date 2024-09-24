@@ -1,5 +1,7 @@
 from typing import List
 import ollama
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # RUN the next models wiht OLLAMA - https://ollama.com/library
 LLM_MODELS = {"llama3.1", "gemma2", "phi3"}
@@ -28,26 +30,60 @@ class OllamaChat:
         embed = ollama.embed(model=model_name, input=txt)
         return embed        
 
-    def get_text_response_with_cascade_of_models(self, msgEntities: List):                      
-        for msgEntity in msgEntities:
-            res_dir = {}
-            for mod_name in self.models:                                  
-                res_dir[mod_name] = self.chat_with_ollama(mod_name, msgEntity.question)
-            msgEntity.llm_answers = res_dir
-        return msgEntities         
+    
+
+    def get_text_response_with_cascade_of_models(self, msgEntities: List):
+        with ThreadPoolExecutor() as executor:
+            futures = []
+            
+            # Submit all tasks for all msgEntities and models at once
+            for msgEntity in msgEntities:
+                res_dir = {}
+                for mod_name in self.models:
+                    future = executor.submit(self.chat_with_ollama, mod_name, msgEntity.question)
+                    futures.append((future, mod_name, msgEntity, res_dir))
+
+            # Collect the results as they are completed
+            for future in as_completed([f[0] for f in futures]):
+                for f in futures:
+                    if f[0] == future:
+                        res_dir = f[3]
+                        mod_name = f[1]
+                        msgEntity = f[2]
+                        res_dir[mod_name] = future.result()
+
+            # Assign results to each msgEntity
+            for _, _, msgEntity, res_dir in futures:
+                msgEntity.llm_answers = res_dir
+
+        return msgEntities
+         
             
     def get_embeddings_with_cascade_of_models(self, msgEntities: List):                      
-        for msgEntity in msgEntities:
-            embed_dir = {}            
-            true_answer_embed_dir = {}
-            for mod_name, llm_answ in msgEntity.llm_answers.items():                                           
-                res = self.text_to_embedding(mod_name, llm_answ)                                                
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = []
+
+            for msgEntity in msgEntities:
+                embed_dir = {}            
+                true_answer_embed_dir = {}
+                
+                for mod_name, llm_answ in msgEntity.llm_answers.items():
+                    # Submit embedding tasks to executor for both llm_answ and true_answer
+                    future_embed = executor.submit(self.text_to_embedding, mod_name, llm_answ)
+                    future_true_embed = executor.submit(self.text_to_embedding, mod_name, msgEntity.true_answer)
+
+                    futures.append((future_embed, future_true_embed, embed_dir, true_answer_embed_dir))
+
+            # Collect the results as they are completed
+            for future_embed, future_true_embed, embed_dir, true_answer_embed_dir in futures:
+                res = future_embed.result()
+                true_embed = future_true_embed.result()
+
                 embed_dir[res.get('model')] = res.get('embeddings')
-                
-                true_embed = self.text_to_embedding(mod_name, msgEntity.true_answer)    
                 true_answer_embed_dir[true_embed.get('model')] = true_embed.get('embeddings')
-                
-            msgEntity.llm_embeddings = embed_dir 
-            msgEntity.true_answer_embeddings = true_answer_embed_dir 
-                                        
+
+            for msgEntity in msgEntities:
+                msgEntity.llm_embeddings = embed_dir 
+                msgEntity.true_answer_embeddings = true_answer_embed_dir 
+
         return msgEntities 

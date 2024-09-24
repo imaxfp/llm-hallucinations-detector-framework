@@ -28,7 +28,10 @@ https://ollama.com/library
 
 ```
 
- ~ ollama run llama3.1
+1. ollama run llama3.1 --verbose
+1. ollama run gemma2 --verbose
+1. ollama run phi3 --verbose
+ 
 pulling manifest
 pulling 8eeb52dfb3bb... 100% ▕████████████████████████████████████████████████████████▏ 4.7 GB
 pulling 73b313b5552d... 100% ▕████████████████████████████████████████████████████████▏ 1.4 KB

@@ -29,7 +29,7 @@ if __name__ == "__main__":
     parser = NaturalQuestionsParser("./data/Natural-Questions-Base-2k.csv")
     logging.info("Read entities")
     step_start_time = time.time()
-    qa_entities = parser.parse_entities(start_line=3, stop_line=10)
+    qa_entities = parser.parse_entities(start_line=24, stop_line=50)
     log_time_taken("parsing entities", step_start_time)
 
     # 2. Send questions to the LLM models and collect responses from the LLMs    
