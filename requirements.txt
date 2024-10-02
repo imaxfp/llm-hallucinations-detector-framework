@@ -4,3 +4,5 @@ matplotlib==3.7
 ollama==0.3.2
 pandas==2.2.2
 numpy<2
+seaborn==0.13
+umap-learn==0.5.6
