@@ -210,6 +210,4 @@ class NaturalQuestionsParser:
                 # Add entity to the list
                 entities.append(entity)
 
-        return entities
-
-    
+        return entities    

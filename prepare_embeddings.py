@@ -19,24 +19,24 @@ def log_time_taken(step_name, start_time):
         logging.info(f"Time taken for {step_name}: {minutes} minutes and {seconds:.2f} seconds")
     else:
         logging.info(f"Time taken for {step_name}: {elapsed_time:.2f} seconds")
-
-if __name__ == "__main__":
-
+        
+        
+def generate(file_path: str, destination_file: str, role_prompt, start_line, stop_line):
     # Start measuring time
     total_start_time = time.time()
 
     # 1. Parse initial file
-    parser = NaturalQuestionsParser("./data/Natural-Questions-Base-2k.csv")
+    parser = NaturalQuestionsParser(file_path)
     logging.info("Read entities")
     step_start_time = time.time()
-    qa_entities = parser.parse_entities(start_line=24, stop_line=50)
+    qa_entities = parser.parse_entities(start_line=start_line, stop_line=stop_line)
     log_time_taken("parsing entities", step_start_time)
 
     # 2. Send questions to the LLM models and collect responses from the LLMs    
     logging.info("Chat with Ollama models")
     step_start_time = time.time()
     ollamaChat = OllamaChat()
-    msgEntities = ollamaChat.get_text_response_with_cascade_of_models(qa_entities)
+    msgEntities = ollamaChat.get_text_response_with_cascade_of_models(role_prompt, qa_entities)
     log_time_taken("chatting with models", step_start_time)
 
     # 3. Create embeddings with Ollama and add them to the dataset
@@ -48,8 +48,14 @@ if __name__ == "__main__":
     # 4. Save results
     logging.info("Store results")
     step_start_time = time.time()
-    parser.store_llms_responses(msgEntities, "./data/Natural-Questions-LLM-responses.csv")
+    parser.store_llms_responses(msgEntities, destination_file)
     log_time_taken("storing results", step_start_time)
 
     # Total time
     log_time_taken("total execution", total_start_time)
+            
+
+if __name__ == "__main__":
+    #responses from llms
+    generate("./data/Natural-Questions-Base-2k.csv", "./data/Natural-Questions-LLM-responsesTest.csv", "", 1, 2)
+    # hal responses

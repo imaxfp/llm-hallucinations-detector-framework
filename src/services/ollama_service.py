@@ -10,11 +10,12 @@ class OllamaChat:
     def __init__(self, models=LLM_MODELS):        
         self.models = models
 
-    def chat_with_ollama(self, model_name, msg):
+    def chat_with_ollama(self, model_name, role_prompt=None, msg=None):
         stream = ollama.chat(
             model=model_name,            
             messages=[
                 {'role': 'system', 'content': 'You are a question-answer helper. Analyze the question and provide a concise answer.'},
+                #{'role': 'system', 'content': "role_prompt"},
                 {'role': 'system', 'content': 'Response have to be about 50 or 60 words.'},
                 {'role': 'system', 'content': 'PAY ATTENTION YOUR Response have to be about 50 or 60 words.'},
                 {'role': 'user', 'content': msg}
@@ -25,14 +26,13 @@ class OllamaChat:
         for chunk in stream:
             res.append(chunk['message']['content'])
         return ''.join(res)
+
     
     def text_to_embedding(seld, model_name, txt):
         embed = ollama.embed(model=model_name, input=txt)
         return embed        
-
     
-
-    def get_text_response_with_cascade_of_models(self, msgEntities: List):
+    def get_text_response_with_cascade_of_models(self, role_prompt, msgEntities: List):
         with ThreadPoolExecutor() as executor:
             futures = []
             
@@ -40,25 +40,25 @@ class OllamaChat:
             for msgEntity in msgEntities:
                 res_dir = {}
                 for mod_name in self.models:
-                    future = executor.submit(self.chat_with_ollama, mod_name, msgEntity.question)
-                    futures.append((future, mod_name, msgEntity, res_dir))
+                    future = executor.submit(self.chat_with_ollama, mod_name, role_prompt, msgEntity.question)
+                    futures.append((future, mod_name, role_prompt, msgEntity, res_dir))
 
             # Collect the results as they are completed
             for future in as_completed([f[0] for f in futures]):
                 for f in futures:
                     if f[0] == future:
-                        res_dir = f[3]
                         mod_name = f[1]
-                        msgEntity = f[2]
+                        role_prompt = f[2]                        
+                        msgEntity = f[3]
+                        res_dir = f[4]                                                                        
                         res_dir[mod_name] = future.result()
 
             # Assign results to each msgEntity
-            for _, _, msgEntity, res_dir in futures:
+            for _, _, _, msgEntity, res_dir in futures:
                 msgEntity.llm_answers = res_dir
 
         return msgEntities
-         
-            
+                     
     def get_embeddings_with_cascade_of_models(self, msgEntities: List):                      
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
@@ -86,4 +86,4 @@ class OllamaChat:
                 msgEntity.llm_embeddings = embed_dir 
                 msgEntity.true_answer_embeddings = true_answer_embed_dir 
 
-        return msgEntities 
+        return msgEntities    
