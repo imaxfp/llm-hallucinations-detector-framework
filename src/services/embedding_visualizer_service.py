@@ -16,7 +16,13 @@ ALPHA = 0.8  # Slightly increase transparency
 MARKER_SIZE = 10  # Increase marker size for better visibility
 ZOOM_FACTOR = 1.2  # Set to 1 for no zoom or remove ZOOM_FACTOR usage
 
-warnings.filterwarnings("ignore", category=UserWarning, module='umap')
+# Suppress UserWarnings
+import warnings
+from tqdm import TqdmWarning
+
+# Suppress TqdmWarnings
+warnings.filterwarnings("ignore")
+np.seterr(all='ignore')
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
