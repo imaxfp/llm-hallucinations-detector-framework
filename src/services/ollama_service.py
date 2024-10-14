@@ -15,8 +15,7 @@ class OllamaChat:
             model=model_name,            
             messages=[
                 {'role': 'system', 'content': 'You are a question-answer helper. Analyze the question and provide a concise answer.'},
-                #{'role': 'system', 'content': "role_prompt"},
-                {'role': 'system', 'content': 'Response have to be about 50 or 60 words.'},
+                {'role': 'system', 'content': role_prompt},
                 {'role': 'system', 'content': 'PAY ATTENTION YOUR Response have to be about 50 or 60 words.'},
                 {'role': 'user', 'content': msg}
             ],

@@ -53,9 +53,31 @@ def generate(file_path: str, destination_file: str, role_prompt, start_line, sto
 
     # Total time
     log_time_taken("total execution", total_start_time)
-            
+
+
+START_LINE = 0
+STOP_LINE = 15             
 
 if __name__ == "__main__":
-    #responses from llms
-    generate("./data/Natural-Questions-Base-2k.csv", "./data/Natural-Questions-LLM-responsesTest.csv", "", 1, 2)
-    # hal responses
+    logging.info("====> Generate Correct Responses")
+    generate("./data/Natural-Questions-Base-2k.csv", "./data/NQ-LLM-responses.csv", "", START_LINE, STOP_LINE)
+    
+    logging.info("====> Generate Factual Inaccuracy")
+    prompt_rule = "Your have to generate 'Factual Inaccuracy' hallucination in your response. Factual Inaccuracy: The model presents incorrect facts, such as wrong numbers, dates, or other factual information, but doesn't invent completely new data."    
+    generate("./data/Natural-Questions-Base-2k.csv", "./data/Factual-Inaccuracy-NQ-LLM-responses.csv", prompt_rule, START_LINE, STOP_LINE)
+
+    logging.info("====> Generate Misinterpretation")
+    prompt_rule = "Your have to generate 'Misinterpretation' hallucination in your response. Misinterpretation: The model misunderstands the context or the user's query, generating a response that is not factually incorrect but doesn't address the core of the question."    
+    generate("./data/Natural-Questions-Base-2k.csv", "./data/Misinterpretation-NQ-LLM-responses.csv", prompt_rule, START_LINE, STOP_LINE)
+    
+    logging.info("====> Generate Needle in a Haystack")
+    prompt_rule = "Your have to generate 'Needle in a Haystack' hallucination in your response. 'Needle in a Haystack:' The model struggles to extract relevant details from a large body of information, leading to incomplete or overly general responses."    
+    generate("./data/Natural-Questions-Base-2k.csv", "./data/Needle-Haystack-NQ-LLM-responses.csv", prompt_rule, START_LINE, STOP_LINE)
+    
+    logging.info("====> Generate Fabrication")
+    prompt_rule = "Your have to generate 'Fabrication' hallucination in your response. Fabrication: The model generates entirely false information that has no basis in reality or the training data."    
+    generate("./data/Natural-Questions-Base-2k.csv", "./data/Fabrication-NQ-LLM-responses.csv", prompt_rule, START_LINE, STOP_LINE)
+    
+    logging.info("====> Generate Structural Hallucination")
+    prompt_rule = "Your have to generate 'Structural Hallucination' hallucination in your response. Structural Hallucination: The model produces erroneous information based on flawed structural reasoning or logic, which results in plausible-sounding but incorrect conclusions"
+    generate("./data/Natural-Questions-Base-2k.csv", "./data/Structural-Hallucination-NQ-LLM-responses.csv", prompt_rule, START_LINE, STOP_LINE)
