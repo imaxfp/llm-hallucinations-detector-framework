@@ -115,21 +115,84 @@ class EmbeddingVisualizer:
                 new_df[column + '_umap'] = [umap_transformed[i] for i in range(umap_transformed.shape[0])]
                 
             except Exception as e:
-                logging.info(f"An error occurred: {e}")     
+                logging.info(f"An error occurred: {e}")            
+        return new_df
+    
 
-        # Store the processed DataFrame
-        self.df_umap_processed = new_df           
-        return self.df_umap_processed
+    def process_embeddings_PCA(self, target_dim, df):
+        """
+        Reduce dimensionality of all columns in the provided DataFrame using PCA and return a new DataFrame.
+        Parameters:
+            target_dim (int): The target dimension for PCA.
+            df (pd.DataFrame): The DataFrame containing the embeddings (each cell containing an array).    
+        Returns:
+            new_df (pd.DataFrame): A DataFrame containing the PCA-reduced embeddings with labeled columns.
+        ------------------------------------
+        Principal Component Analysis (PCA) is a dimensionality reduction technique that transforms 
+        a dataset to a lower-dimensional space while retaining as much variance as possible. 
+        Here's a breakdown of the PCA process:
+
+        1. **Standardize the Data**: Center the data by subtracting the mean of each feature. 
+        This ensures that all features have a mean of zero, which is essential for PCA to work effectively.
+        
+        2. **Compute the Covariance Matrix**: Calculate the covariance matrix of the standardized data.
+        The covariance matrix reveals the relationships between different features in terms of their variances 
+        and how they co-vary with each other.
+        
+        3. **Calculate Eigenvalues and Eigenvectors**: Decompose the covariance matrix to get eigenvalues and 
+        eigenvectors. Eigenvalues indicate the amount of variance captured by each principal component, 
+        while eigenvectors indicate the direction of each component in the original feature space.
+        
+        4. **Sort and Select Principal Components**: Sort the eigenvalues in descending order and select the top 
+        `target_dim` eigenvectors corresponding to the largest eigenvalues. These eigenvectors represent the 
+        directions (principal components) that capture the most variance in the data.
+        
+        5. **Project the Data**: Transform the original data onto the selected principal components to reduce its 
+        dimensionality. This results in a new representation of the data in a lower-dimensional space, where 
+        each dimension is a principal component capturing the maximum possible variance.
+        
+        This method allows us to capture the most important patterns in the data while reducing noise and 
+        computational complexity in higher-dimensional spaces.
+
+        Main Logic:
+        - Expand any list-like entries in the columns to separate dimensions.
+        - Apply PCA on the expanded DataFrame to reduce the data to the desired number of dimensions.
+        - Return a new DataFrame with the PCA-reduced embeddings.
+        """
+        # Expand each list in the columns to separate columns for each dimension in the embeddings
+        expanded_df = pd.DataFrame()
+
+        for col in df.columns:
+            # Expand each list-like cell in the column into separate columns
+            expanded_cols = pd.DataFrame(df[col].tolist(), index=df.index)
+            # Rename columns with original column name as prefix
+            expanded_cols.columns = [f"{col}_{i}" for i in range(expanded_cols.shape[1])]
+            expanded_df = pd.concat([expanded_df, expanded_cols], axis=1)
+
+        # Apply PCA to reduce dimensions
+        pca = PCA(n_components=target_dim)
+        reduced_embeddings = pca.fit_transform(expanded_df.values)
+        
+        # Create a new DataFrame to hold the PCA results with meaningful column names
+        new_df = pd.DataFrame(reduced_embeddings, columns=[f"PCA_{i+1}" for i in range(target_dim)])
+        
+        logging.info(f"PCA applied. New DataFrame shape: {new_df.shape}")
+        
+        return new_df
+
+    
+    # TODO add t-SNE  
+
         
     #######
     # Plot UMAP 2D
     #######
-    def plot_umap_2d(self, title=str(), save_path=None):
+    def plot_umap_2d(self, df, title=str(), save_path=None):
         plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
 
         # Get the number of columns in the DataFrame
-        num_columns = self.df_umap_processed.shape[1]  # Using the new DataFrame with UMAP processed data
-        column_names = self.df_umap_processed.columns
+        num_columns = df.shape[1]  # Using the new DataFrame with UMAP processed data
+        column_names = df.columns
 
         # Create a colormap with distinct colors based on the number of columns
         cmap = plt.cm.get_cmap('tab10', num_columns)  # 'tab10' provides up to 10 distinct colors
@@ -141,7 +204,7 @@ class EmbeddingVisualizer:
         # Plot each column's coordinates
         for i, column in enumerate(column_names):
             # Extract the UMAP coordinates for the current column
-            umap_coords = np.array(self.df_umap_processed[column].tolist())            
+            umap_coords = np.array(df[column].tolist())            
             # Choose marker; wrap around if more columns than markers
             marker = markers[i % num_markers]            
             # Scatter plot for the current column with unique color and marker
@@ -155,20 +218,22 @@ class EmbeddingVisualizer:
 
         # Automatically adjust the layout
         plt.tight_layout()
-        # Save the plot to the specified path
-        plt.savefig(save_path)
+        # Save the plot to the specified path, if provided
+        if save_path:
+            plt.savefig(save_path)
         # Show the plot
         plt.show()
 
 
 
-    def plot_umap_3d(self, title=str(), save_path=None):
+
+    def plot_umap_3d(self, df, title=str(), save_path=None):
         fig = plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
         ax = fig.add_subplot(111, projection='3d')  # Set up a 3D plot
 
         # Get the number of columns in the DataFrame
-        num_columns = self.df_umap_processed.shape[1]
-        column_names = self.df_umap_processed.columns
+        num_columns = df.shape[1]
+        column_names = df.columns
 
         # Create a colormap with distinct colors based on the number of columns
         cmap = plt.cm.get_cmap('tab10', num_columns)
@@ -180,7 +245,7 @@ class EmbeddingVisualizer:
         # Plot each column's coordinates
         for i, column in enumerate(column_names):
             # Extract the UMAP coordinates for the current column
-            umap_coords = np.array(self.df_umap_processed[column].tolist())
+            umap_coords = np.array(df[column].tolist())
             
             # Choose marker; wrap around if more columns than markers
             marker = markers[i % num_markers]
@@ -203,7 +268,7 @@ class EmbeddingVisualizer:
         plt.show()
     
 
-    def plot_umap_12d_4x3d(self, title=str(), save_path=None):
+    def plot_umap_12d_4x3d(self, df, title=str(), save_path=None):
         # Define sets of components to plot in 3D (four sets of three components each)
         component_sets = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11)]
         
@@ -213,8 +278,8 @@ class EmbeddingVisualizer:
             ax = fig.add_subplot(111, projection='3d')
 
             # Get the number of columns in the DataFrame
-            num_columns = self.df_umap_processed.shape[1]
-            column_names = self.df_umap_processed.columns
+            num_columns = df.shape[1]
+            column_names = df.columns
 
             # Create a colormap with distinct colors based on the number of columns
             cmap = plt.cm.get_cmap('tab10', num_columns)
@@ -226,7 +291,7 @@ class EmbeddingVisualizer:
             # Plot each column's coordinates for the current set of components
             for i, column in enumerate(column_names):
                 # Extract the UMAP coordinates for the current column
-                umap_coords = np.array(self.df_umap_processed[column].tolist())
+                umap_coords = np.array(df[column].tolist())
                 
                 # Choose marker; wrap around if more columns than markers
                 marker = markers[i % num_markers]
@@ -253,48 +318,3 @@ class EmbeddingVisualizer:
             
             # Show each plot
             plt.show()
-
-
-
-    #######    
-    # Transform embeddings with PCA  
-    # TODO Techniques like PCA or t-SNE     
-    #######
-    def process_embeddings_PCA(self, target_dim):
-        """
-        Reduce dimensionality using PCA to a target dimension and return the embeddings and labels.
-        """
-        # Extract and process embeddings
-        self.df['ta_embd_llama3'] = self.df['true_answer_embedding_llama3.1']
-        self.df['ta_embd_gemma2'] = self.df['true_answer_embedding_gemma2']
-        self.df['ta_embd_phi3'] = self.df['true_answer_embedding_phi3'].apply(self.get_embedding)
-
-        # Drop the original embedding columns
-        self.df = self.df.drop(columns=['true_answer_embedding_gemma2', 'true_answer_embedding_llama3.1', 'true_answer_embedding_phi3'])
-
-        # Initialize lists to hold results
-        reduced_embeddings = []
-        labels = []
-        
-        # Process each embedding type
-        for i, (embedding_col, label) in enumerate(zip(['ta_embd_llama3', 'ta_embd_gemma2', 'ta_embd_phi3'], [0, 1, 2])):
-            # Expand the current embedding column
-            df_expanded = self.expand_embedding_column(self.df[[embedding_col]], embedding_col)
-
-            # Extract embeddings
-            embeddings = df_expanded.values
-            pca = PCA(n_components=target_dim)
-            reduced = pca.fit_transform(embeddings)
-                
-            # Append reduced embeddings and corresponding labels
-            reduced_embeddings.append(reduced)
-            labels.extend([label] * reduced.shape[0])  # Extend labels for the number of embeddings
-
-        # Concatenate all reduced embeddings into a single array        
-        self.embeddings = np.vstack(reduced_embeddings)
-        self.labels = np.array(labels)
-        
-        # Initialize label names here after processing embeddings
-        #self.label_names = {0: "Llama3", 1: "Gemma2", 2: "Phi3"}
-        logging.info(f"Label names set to {self.label_names}")
-        logging.info(f"PCA applied. Reduced embeddings shape: {self.embeddings.shape}")
