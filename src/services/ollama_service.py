@@ -264,7 +264,6 @@ class NaturalQuestionsParser:
 
         return df
 
-
     def store_llms_responses(self, entities: list, res_file_path: str):
         # Prepare a list of dictionaries for storing rows
         data = []
@@ -272,7 +271,6 @@ class NaturalQuestionsParser:
         all_llm_embedding_keys = set()
         all_true_answ_embedding_keys = set()
 
- 
         # For each entity, create a dictionary row
         for entity in entities:
             all_llm_answer_keys.update(entity.llm_answers.keys())
@@ -293,7 +291,7 @@ class NaturalQuestionsParser:
                 row[f"embedding_{emb_key}"] = entity.llm_embeddings.get(emb_key, "")
                 
             for emb_key in all_true_answ_embedding_keys:
-                row[f"true_answer_embedding_{emb_key}"] = entity.true_answer_embeddings.get(emb_key, "")                
+                row[f"true_answer_embedding_{emb_key}"] = entity.true_answer_embeddings.get(emb_key, "")
             
             data.append(row)
 
@@ -305,11 +303,8 @@ class NaturalQuestionsParser:
             # Read the existing CSV file
             existing_df = pd.read_csv(res_file_path)
 
-            # Filter out entities that already exist (based on 'uid')
-            new_df = new_df[~new_df['uid'].isin(existing_df['uid'])]
-
-            # Append the new records to the existing dataframe
-            combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+            # Merge new_df with existing_df on 'uid', giving priority to new_df values
+            combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=['uid'], keep='last')
         else:
             # If no file exists, just use the new dataframe
             combined_df = new_df
