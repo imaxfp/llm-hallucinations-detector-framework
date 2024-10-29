@@ -120,10 +120,6 @@ class EmbeddingVisualizer:
         # Store the processed DataFrame
         self.df_umap_processed = new_df           
         return self.df_umap_processed
-
- 
-
-
         
     #######
     # Plot UMAP 2D
@@ -166,40 +162,98 @@ class EmbeddingVisualizer:
 
 
 
-    #######
-    # Plot UMAP 3D
-    #######
-    def plot_umap_3d(self):
-        fig = plt.figure(figsize=PLOT_SIZE)
-        ax = fig.add_subplot(111, projection='3d')
+    def plot_umap_3d(self, title=str(), save_path=None):
+        fig = plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
+        ax = fig.add_subplot(111, projection='3d')  # Set up a 3D plot
 
-        # Create the same colormap for consistency
-        cmap = plt.cm.get_cmap('viridis', len(self.label_names))
+        # Get the number of columns in the DataFrame
+        num_columns = self.df_umap_processed.shape[1]
+        column_names = self.df_umap_processed.columns
 
-        # Scatter for each label dynamically using label names
-        for label_value, label_name in self.label_names.items():
-            ax.scatter(self.embedding_umap[self.labels == label_value, 0], 
-                       self.embedding_umap[self.labels == label_value, 1], 
-                       self.embedding_umap[self.labels == label_value, 2],
-                       label=label_name, alpha=ALPHA, s=MARKER_SIZE * 1.5, c=cmap(label_value))
+        # Create a colormap with distinct colors based on the number of columns
+        cmap = plt.cm.get_cmap('tab10', num_columns)
 
-        # Adjust axis scaling automatically to fit the data
-        ax.auto_scale_xyz([np.min(self.embedding_umap[:, 0]) * ZOOM_FACTOR, np.max(self.embedding_umap[:, 0]) * ZOOM_FACTOR],
-                          [np.min(self.embedding_umap[:, 1]) * ZOOM_FACTOR, np.max(self.embedding_umap[:, 1]) * ZOOM_FACTOR],
-                          [np.min(self.embedding_umap[:, 2]) * ZOOM_FACTOR, np.max(self.embedding_umap[:, 2]) * ZOOM_FACTOR])
+        # Define different markers for the objects
+        markers = ['o', 's', '^', 'D', '*', 'P', 'X', 'H', 'v', '<']
+        num_markers = len(markers)
 
-        # Add title, axis labels, and legend
-        ax.set_title("3D UMAP Projection of Embeddings", fontsize=16)
-        ax.set_xlabel("UMAP 1", fontsize=12)
-        ax.set_ylabel("UMAP 2", fontsize=12)
-        ax.set_zlabel("UMAP 3", fontsize=12)
-        ax.legend()
+        # Plot each column's coordinates
+        for i, column in enumerate(column_names):
+            # Extract the UMAP coordinates for the current column
+            umap_coords = np.array(self.df_umap_processed[column].tolist())
+            
+            # Choose marker; wrap around if more columns than markers
+            marker = markers[i % num_markers]
+            
+            # Scatter plot for the current column with unique color and marker
+            ax.scatter(umap_coords[:, 0], umap_coords[:, 1], umap_coords[:, 2], label=column, alpha=0.7, s=20, color=cmap(i), marker=marker)
 
-        # Save the plot and display
-        plt.savefig(self.result_image_path)
-        logging.info(f"3D UMAP plot saved at {self.result_image_path}")
+        # Add title, labels, and legend
+        ax.set_title(title, fontsize=14)
+        ax.set_xlabel("UMAP Component 1", fontsize=8)
+        ax.set_ylabel("UMAP Component 2", fontsize=8)
+        ax.set_zlabel("UMAP Component 3", fontsize=8)
+        ax.legend(title="Objects", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # Automatically adjust the layout
+        plt.tight_layout()
+        # Save the plot to the specified path
+        plt.savefig(save_path)
+        # Show the plot
         plt.show()
     
+
+    def plot_umap_12d_4x3d(self, title=str(), save_path=None):
+        # Define sets of components to plot in 3D (four sets of three components each)
+        component_sets = [(0, 1, 2), (3, 4, 5), (6, 7, 8), (9, 10, 11)]
+        
+        # Iterate over each set of components and create a separate 3D plot
+        for idx, (comp_x, comp_y, comp_z) in enumerate(component_sets):
+            fig = plt.figure(figsize=(10, 8))
+            ax = fig.add_subplot(111, projection='3d')
+
+            # Get the number of columns in the DataFrame
+            num_columns = self.df_umap_processed.shape[1]
+            column_names = self.df_umap_processed.columns
+
+            # Create a colormap with distinct colors based on the number of columns
+            cmap = plt.cm.get_cmap('tab10', num_columns)
+
+            # Define different markers for the objects
+            markers = ['o', 's', '^', 'D', '*', 'P', 'X', 'H', 'v', '<']
+            num_markers = len(markers)
+
+            # Plot each column's coordinates for the current set of components
+            for i, column in enumerate(column_names):
+                # Extract the UMAP coordinates for the current column
+                umap_coords = np.array(self.df_umap_processed[column].tolist())
+                
+                # Choose marker; wrap around if more columns than markers
+                marker = markers[i % num_markers]
+                
+                # Scatter plot for the current column with unique color and marker
+                ax.scatter(
+                    umap_coords[:, comp_x], umap_coords[:, comp_y], umap_coords[:, comp_z], 
+                    label=column, alpha=0.7, s=20, color=cmap(i), marker=marker
+                )
+
+            # Set plot labels and title, indicating the components used in this plot
+            ax.set_title(f"{title} (Components {comp_x+1}, {comp_y+1}, {comp_z+1})", fontsize=14)
+            ax.set_xlabel(f"UMAP Component {comp_x+1}", fontsize=8)
+            ax.set_ylabel(f"UMAP Component {comp_y+1}", fontsize=8)
+            ax.set_zlabel(f"UMAP Component {comp_z+1}", fontsize=8)
+            ax.legend(title="Objects", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+            # Automatically adjust the layout
+            plt.tight_layout()
+            
+            # Save each plot with a different name, indicating which components are plotted
+            if save_path:
+                plt.savefig(f"{save_path.rstrip('.png')}_comp_{comp_x+1}_{comp_y+1}_{comp_z+1}.png")
+            
+            # Show each plot
+            plt.show()
+
 
 
     #######    
@@ -244,29 +298,3 @@ class EmbeddingVisualizer:
         #self.label_names = {0: "Llama3", 1: "Gemma2", 2: "Phi3"}
         logging.info(f"Label names set to {self.label_names}")
         logging.info(f"PCA applied. Reduced embeddings shape: {self.embeddings.shape}")
-
-
-if __name__ == "__main__":    
-    true_answer_columns = ['true_answer_embedding_llama3.1']    
-    llm_generation_columns = [ 'embedding_llama3.1']      
-
-    df_llm_res = pd.read_csv('./data/NQ-LLM-responses.csv')
-    df_fabrication_hallucinations = pd.read_csv('./data/Fabrication-NQ-LLM-responses.csv')
-    print(df_fabrication_hallucinations.columns)
-
-    # Create a new DataFrame by selecting specific columns and renaming them
-    new_df_llm_res = df_llm_res[['true_answer_embedding_llama3.1', 'embedding_llama3.1']].rename(
-        columns={
-            'true_answer_embedding_llama3.1': 'True_answer',
-            'embedding_llama3.1': 'answer_llama3.1'
-        }
-    )
-    # Create a new DataFrame by selecting specific columns and renaming them
-    new_df_fabrication_hallucinations = df_llm_res[['embedding_llama3.1']].rename(
-        columns={
-            'embedding_llama3.1': 'answer_llama3.1'
-        }
-    )
-
-    combined_df = pd.concat([new_df_llm_res, new_df_fabrication_hallucinations], axis=1)
-    print(combined_df.columns)
