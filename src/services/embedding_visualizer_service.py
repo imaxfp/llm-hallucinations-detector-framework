@@ -1,11 +1,12 @@
 import logging
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D  # Necessary for 3D plotting
+import seaborn as sns
+import matplotlib.pyplot as plt  # You still need matplotlib as a backend
 import numpy as np
 import pandas as pd
-import umap
 import warnings
 from sklearn.decomposition import PCA
+import umap as mp
+import ast
 
 # Constants (adjusted for visibility and scaling)
 N_NEIGHBORS = 10  # Adjusted for better local/global balance
@@ -18,7 +19,7 @@ ZOOM_FACTOR = 1.2  # Keep as is or adjust based on visualization needs
 
 # Suppress UserWarnings
 import warnings
-from tqdm import TqdmWarning
+#from tqdm import TqdmWarning
 
 # Suppress TqdmWarnings
 warnings.filterwarnings("ignore")
@@ -26,27 +27,51 @@ np.seterr(all='ignore')
 # Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 class EmbeddingVisualizer:
-    def __init__(self, dataset_path, result_image_path):
-        self.dataset_path = dataset_path
-        self.result_image_path = result_image_path
-        
-        self.df = None
+    def __init__(self, df=None, dataset_path=None):
+        self.dataset_path = dataset_path        
+        self.df = df
         self.df_prepared = None
         self.df_umap_processed = None
-        self.labels = None
-        
+        self.labels = None                 
 
     def load_data(self):
         pd.set_option('display.max_columns', None)
         self.df = pd.read_csv(self.dataset_path)
         logging.info(f"Data loaded with shape {self.df.shape}")
-        logging.info(f"Columns: {self.df.columns}")
+        logging.info(f"Columns: {self.df.columns}")        
+        return self.df
 
-    def get_embedding(self, input_str):
-        input_str = input_str[2:-2]
-        return [float(item) for item in input_str.split(", ")]
+    
+    def convert_columns_to_float_arrays(self):                
+        """Convert all columns of the DataFrame from string representations of lists to flat NumPy float arrays."""
+        for col in self.df.columns:
+            self.df[col] = self.df[col].apply(
+                lambda sequence: np.array(ast.literal_eval(sequence), dtype=float).flatten() if isinstance(sequence, str) else sequence
+            )
+            
+
+    def pad_to_max_len(self, sequence, max_len):
+        # Pad or truncate the sequence to the desired length, and make sure it's a float array
+        return np.pad(sequence[:max_len], (0, max(0, max_len - len(sequence))), mode='constant').astype(float)
+ 
+    def process_embeddings_padding(self):
+        """Process the DataFrame by converting string columns to float arrays and applying padding."""
+        
+        # Calculate the maximum length across all columns
+        max_len = self.df.applymap(len).max().max()
+
+        # Apply padding to all columns
+        for col in self.df.columns:
+            self.df[col] = self.df[col].apply(lambda x: self.pad_to_max_len(x, max_len))
+
+        # Store the padded DataFrame
+        self.df_prepared = self.df
+
+        # Logging
+        logging.info(f'Max length across specified columns: {max_len}')
+        logging.info(self.df.columns.tolist())   
+        logging.info(f"Padding applied. Reduced embeddings shape: {self.df_prepared.shape}")        
     
     def apply_umap(self, n_components):        
         """
@@ -62,140 +87,48 @@ class EmbeddingVisualizer:
             logging.error("Embeddings are empty. Cannot apply UMAP.")
             return None
 
+
+        # Create a new DataFrame to hold the UMAP results
+        new_df = pd.DataFrame()
+
         # Create UMAP model
-        umap_model = umap.UMAP(
+        umap_model = mp.UMAP(
             n_neighbors=N_NEIGHBORS,
             min_dist=MIN_DIST,
             n_components=n_components,
             random_state=RANDOM_STATE)
         
-        try:
-            # Create a new DataFrame to hold the UMAP results
-            new_df = pd.DataFrame(columns=self.df_prepared.columns)
+        for column in self.df_prepared:
 
-            # Process each embedding entity separately
-            for column in self.df_prepared.columns:
-                # Stack the arrays of the current column into a 2D array
-                data_to_compress = np.array(self.df_prepared[column].tolist())
+            logging.debug(f"COLUMN DATA: {self.df_prepared[column]}")
+            try:                                                            
+                # Stack the arrays into a 2D array of shape (n_samples, n_features)
+                #data_to_compress = np.stack(self.df_prepared[column].values)
+                #column_data = self.df_prepared[column].values.reshape(-1, 1)
 
-                # Initialize UMAP
-                umap_model = umap.UMAP(n_components=2)
+                column_data = np.stack(self.df_prepared[column].values)
 
-                # Fit and transform the data for the current column
-                compressed_data = umap_model.fit_transform(data_to_compress)
+                # Apply UMAP
+                umap_transformed = umap_model.fit_transform(column_data)
+                
+                # Add the compressed data to the new DataFrame as a single column
+                new_df[column + '_umap'] = [umap_transformed[i] for i in range(umap_transformed.shape[0])]
+                
+            except Exception as e:
+                logging.info(f"An error occurred: {e}")     
 
-                # Add the compressed data to the new DataFrame
-                new_df[column] = [compressed_data[i] for i in range(compressed_data.shape[0])]
-
-            # Display the new DataFrame
-            #logging.info(new_df)
-            self.df_umap_processed = new_df
-
-        except Exception as e:                       
-            logging.info(f"An error occurred: {e}")       
-        
+        # Store the processed DataFrame
+        self.df_umap_processed = new_df           
         return self.df_umap_processed
 
-
-
-    ########
-    # Process embeddings with padding 
-    ########
-    def pad_embeddings(self, col, max_len):        
-        """
-        Pads each element of the input column to ensure they all have the same length.
-        
-        Args:
-            col (pandas Series): The column to pad.
-            max_len (int): The maximum length to pad to.
-
-        Returns:
-            pandas Series: A new Series where each list in the original column is padded with zeros to reach max_len.
-        """        
-        """Pads an individual embedding to max_len."""
-        return col + [0] * (max_len - len(col)) if len(col) < max_len else col
-
  
-    def process_embeddings_padding(self, true_answer_columns, llm_generation_columns):                                                          
-        embedding_columns = true_answer_columns + llm_generation_columns        
-        
-        for col in embedding_columns:
-            self.df[col] = self.df[col].apply(self.get_embedding)             
-            
-        # Delete all columns except those in the embedding_columns list
-        cols_to_drop = self.df.columns.difference(embedding_columns)
-        self.df.drop(columns=cols_to_drop, inplace=True)  
-        
-        # Calculate maximum lengths for each column in embedding_columns
-        max_len = 0
-        for col in self.df.columns:
-            if col in embedding_columns:
-                current_max_length = self.df[col].apply(len).max()
-                max_len = max(max_len, current_max_length)
-        #apply padding
-        for col in self.df.columns:
-            if col in embedding_columns:
-                self.df[col] = self.df[col].apply(lambda x: self.pad_embeddings(x, max_len))
-                
-
-        # Print the maximum length found
-        logging.info(f'Max length across specified columns: {max_len}')                  
-        logging.info(self.df.columns.tolist())   
-        
-        # Apply pad_embeddings to all columns of the DataFrame
-        self.df_prepared = self.df
-                           
-        # Initialize label names (if required)
-        logging.info(f"Padding applied. Reduced embeddings shape: {self.df_prepared.shape}")
 
 
-
-    #######    
-    # Transform embeddings with PCA      
-    #######
-    def process_embeddings_PCA(self, target_dim):
-        """
-        Reduce dimensionality using PCA to a target dimension and return the embeddings and labels.
-        """
-        # Extract and process embeddings
-        self.df['ta_embd_llama3'] = self.df['true_answer_embedding_llama3.1'].apply(self.get_embedding)
-        self.df['ta_embd_gemma2'] = self.df['true_answer_embedding_gemma2'].apply(self.get_embedding)
-        self.df['ta_embd_phi3'] = self.df['true_answer_embedding_phi3'].apply(self.get_embedding)
-
-        # Drop the original embedding columns
-        self.df = self.df.drop(columns=['true_answer_embedding_gemma2', 'true_answer_embedding_llama3.1', 'true_answer_embedding_phi3'])
-
-        # Initialize lists to hold results
-        reduced_embeddings = []
-        labels = []
-        
-        # Process each embedding type
-        for i, (embedding_col, label) in enumerate(zip(['ta_embd_llama3', 'ta_embd_gemma2', 'ta_embd_phi3'], [0, 1, 2])):
-            # Expand the current embedding column
-            df_expanded = self.expand_embedding_column(self.df[[embedding_col]], embedding_col)
-
-            # Extract embeddings
-            embeddings = df_expanded.values
-            pca = PCA(n_components=target_dim)
-            reduced = pca.fit_transform(embeddings)
-                
-            # Append reduced embeddings and corresponding labels
-            reduced_embeddings.append(reduced)
-            labels.extend([label] * reduced.shape[0])  # Extend labels for the number of embeddings
-
-        # Concatenate all reduced embeddings into a single array        
-        self.embeddings = np.vstack(reduced_embeddings)
-        self.labels = np.array(labels)
-        
-        # Initialize label names here after processing embeddings
-        #self.label_names = {0: "Llama3", 1: "Gemma2", 2: "Phi3"}
-        logging.info(f"Label names set to {self.label_names}")
-        logging.info(f"PCA applied. Reduced embeddings shape: {self.embeddings.shape}")
         
     #######
     # Plot UMAP 2D
     #######
-    def plot_umap_2d(self, title=str(), save_path='./data/results/umap_2d.png'):
+    def plot_umap_2d(self, title=str(), save_path=None):
         plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
 
         # Get the number of columns in the DataFrame
@@ -269,14 +202,71 @@ class EmbeddingVisualizer:
     
 
 
-if __name__ == "__main__":
-    
-    true_answer_columns = ['true_answer_embedding_llama3.1', 'true_answer_embedding_gemma2', 'true_answer_embedding_phi3']    
-    llm_generation_columns = [ 'embedding_llama3.1', 'embedding_gemma2', 'embedding_phi3']      
-    
-    vis = EmbeddingVisualizer('./data/Fabrication-NQ-LLM-responses.csv', './data/results')
-    vis.load_data()
-    #vis.process_embeddings_PCA(target_dim=10)
-    vis.process_embeddings_padding(true_answer_columns, llm_generation_columns)
-    vis.apply_umap(n_components=2)
-    vis.plot_umap_2d()
+    #######    
+    # Transform embeddings with PCA  
+    # TODO Techniques like PCA or t-SNE     
+    #######
+    def process_embeddings_PCA(self, target_dim):
+        """
+        Reduce dimensionality using PCA to a target dimension and return the embeddings and labels.
+        """
+        # Extract and process embeddings
+        self.df['ta_embd_llama3'] = self.df['true_answer_embedding_llama3.1']
+        self.df['ta_embd_gemma2'] = self.df['true_answer_embedding_gemma2']
+        self.df['ta_embd_phi3'] = self.df['true_answer_embedding_phi3'].apply(self.get_embedding)
+
+        # Drop the original embedding columns
+        self.df = self.df.drop(columns=['true_answer_embedding_gemma2', 'true_answer_embedding_llama3.1', 'true_answer_embedding_phi3'])
+
+        # Initialize lists to hold results
+        reduced_embeddings = []
+        labels = []
+        
+        # Process each embedding type
+        for i, (embedding_col, label) in enumerate(zip(['ta_embd_llama3', 'ta_embd_gemma2', 'ta_embd_phi3'], [0, 1, 2])):
+            # Expand the current embedding column
+            df_expanded = self.expand_embedding_column(self.df[[embedding_col]], embedding_col)
+
+            # Extract embeddings
+            embeddings = df_expanded.values
+            pca = PCA(n_components=target_dim)
+            reduced = pca.fit_transform(embeddings)
+                
+            # Append reduced embeddings and corresponding labels
+            reduced_embeddings.append(reduced)
+            labels.extend([label] * reduced.shape[0])  # Extend labels for the number of embeddings
+
+        # Concatenate all reduced embeddings into a single array        
+        self.embeddings = np.vstack(reduced_embeddings)
+        self.labels = np.array(labels)
+        
+        # Initialize label names here after processing embeddings
+        #self.label_names = {0: "Llama3", 1: "Gemma2", 2: "Phi3"}
+        logging.info(f"Label names set to {self.label_names}")
+        logging.info(f"PCA applied. Reduced embeddings shape: {self.embeddings.shape}")
+
+
+if __name__ == "__main__":    
+    true_answer_columns = ['true_answer_embedding_llama3.1']    
+    llm_generation_columns = [ 'embedding_llama3.1']      
+
+    df_llm_res = pd.read_csv('./data/NQ-LLM-responses.csv')
+    df_fabrication_hallucinations = pd.read_csv('./data/Fabrication-NQ-LLM-responses.csv')
+    print(df_fabrication_hallucinations.columns)
+
+    # Create a new DataFrame by selecting specific columns and renaming them
+    new_df_llm_res = df_llm_res[['true_answer_embedding_llama3.1', 'embedding_llama3.1']].rename(
+        columns={
+            'true_answer_embedding_llama3.1': 'True_answer',
+            'embedding_llama3.1': 'answer_llama3.1'
+        }
+    )
+    # Create a new DataFrame by selecting specific columns and renaming them
+    new_df_fabrication_hallucinations = df_llm_res[['embedding_llama3.1']].rename(
+        columns={
+            'embedding_llama3.1': 'answer_llama3.1'
+        }
+    )
+
+    combined_df = pd.concat([new_df_llm_res, new_df_fabrication_hallucinations], axis=1)
+    print(combined_df.columns)
