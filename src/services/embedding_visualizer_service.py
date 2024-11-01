@@ -11,7 +11,7 @@ import ast
 # Constants (adjusted for visibility and scaling)
 N_NEIGHBORS = 10  # Adjusted for better local/global balance
 MIN_DIST = 0.2    # Slightly increased to avoid clustering all points together
-RANDOM_STATE = 42  # Keep this for reproducibility
+RANDOM_STATE = 17  # Keep this for reproducibility
 PLOT_SIZE = (10, 8)  # No change
 ALPHA = 0.8  # Keep for transparency
 MARKER_SIZE = 10  # No change, fine for visibility
