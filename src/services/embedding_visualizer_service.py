@@ -73,7 +73,7 @@ class EmbeddingVisualizer:
         logging.info(self.df.columns.tolist())   
         logging.info(f"Padding applied. Reduced embeddings shape: {self.df_prepared.shape}")        
     
-    def apply_umap(self, n_components):        
+    def apply_umap(self, n_components=2, rand_state=RANDOM_STATE):        
         """
         UMAP (Uniform Manifold Approximation and Projection) is designed to find meaningful low-dimensional representations
         of data by analyzing the relationships between multiple data points
@@ -96,7 +96,7 @@ class EmbeddingVisualizer:
             n_neighbors=N_NEIGHBORS,
             min_dist=MIN_DIST,
             n_components=n_components,
-            random_state=RANDOM_STATE)
+            random_state=rand_state)
         
         for column in self.df_prepared:
 
@@ -181,21 +181,30 @@ class EmbeddingVisualizer:
         return new_df
 
     
-    # TODO add t-SNE  
-
-        
+    # TODO add t-SNE      
     #######
     # Plot UMAP 2D
     #######
-    def plot_umap_2d(self, df, title=str(), save_path=None):
+    def plot_umap_2d(self, df, centroids, title=str(), save_path=None, x_lim=(-40, 40), y_lim=(-40, 40)):
+        """
+        Plot UMAP 2D visualization with centroids marked as red dots.
+        
+        Args:
+            df (pd.DataFrame): DataFrame with UMAP coordinates for each set.
+            centroids (pd.DataFrame): DataFrame with centroids for each group.
+            title (str): Title of the plot.
+            save_path (str): Path to save the plot.
+            x_lim (tuple): Static x-axis limits.
+            y_lim (tuple): Static y-axis limits.
+        """
         plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
 
         # Get the number of columns in the DataFrame
-        num_columns = df.shape[1]  # Using the new DataFrame with UMAP processed data
+        num_columns = df.shape[1]
         column_names = df.columns
 
         # Create a colormap with distinct colors based on the number of columns
-        cmap = plt.cm.get_cmap('tab10', num_columns)  # 'tab10' provides up to 10 distinct colors
+        cmap = plt.cm.get_cmap('tab10', num_columns)
 
         # Define different markers for the objects
         markers = ['o', 's', '^', 'D', '*', 'P', 'X', 'H', 'v', '<']  # Add more if needed
@@ -204,11 +213,21 @@ class EmbeddingVisualizer:
         # Plot each column's coordinates
         for i, column in enumerate(column_names):
             # Extract the UMAP coordinates for the current column
-            umap_coords = np.array(df[column].tolist())            
+            umap_coords = np.vstack(df[column].values)
+            
             # Choose marker; wrap around if more columns than markers
-            marker = markers[i % num_markers]            
+            marker = markers[i % num_markers]
+            
             # Scatter plot for the current column with unique color and marker
             plt.scatter(umap_coords[:, 0], umap_coords[:, 1], label=column, alpha=0.7, s=20, color=cmap(i), marker=marker)
+            
+            # Plot the centroid as a bold red dot
+            centroid = centroids.loc[column].values  # Extract centroid coordinates from DataFrame
+            plt.scatter(centroid[0], centroid[1], color='red', s=50, edgecolor='black', marker='o', zorder=1)
+
+        # Set static x and y axis limits
+        plt.xlim(x_lim)
+        plt.ylim(y_lim)
 
         # Add title, labels, and legend
         plt.title(title, fontsize=14)
@@ -218,14 +237,12 @@ class EmbeddingVisualizer:
 
         # Automatically adjust the layout
         plt.tight_layout()
+        
         # Save the plot to the specified path, if provided
         if save_path:
             plt.savefig(save_path)
         # Show the plot
         plt.show()
-
-
-
 
     def plot_umap_3d(self, df, title=str(), save_path=None):
         fig = plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
