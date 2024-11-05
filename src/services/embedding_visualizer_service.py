@@ -222,7 +222,7 @@ class EmbeddingVisualizer:
     #######
     # Plot UMAP 2D
     #######
-    def plot_umap_2d(self, df, centroids, title=str(), x_lim=(-25, 25), y_lim=(-25, 25)):
+    def plot_umap_2d(self, df, centroids, title=str(), x_lim=(-15, 15), y_lim=(-15, 15)):
         """
         Plot UMAP 2D visualization with centroids marked as red dots and return the plot as an image buffer.
         
@@ -245,11 +245,18 @@ class EmbeddingVisualizer:
         num_columns = df.shape[1]
         column_names = df.columns
 
+        # Center the x_lim and y_lim around the mean position of all data
+        all_coords = np.vstack([np.vstack(df[col].values) for col in df.columns])
+        center_x = float(np.mean(all_coords[:, 0]))
+        center_y = float(np.mean(all_coords[:, 1]))
+        x_lim = (center_x + float(x_lim[0]), center_x + float(x_lim[1]))
+        y_lim = (center_y + float(y_lim[0]), center_y + float(y_lim[1]))
+
         # Create a colormap with distinct colors based on the number of columns
         cmap = plt.cm.get_cmap('tab10', num_columns)
 
         # Define different markers for the objects
-        markers = ['o', 's', '^', 'D', '*', 'P', 'X', 'H', 'v', '<']  # Add more if needed
+        markers = ['o', 's', '^', 'D', '*', 'P', 'X', 'H', 'v', '<']
         num_markers = len(markers)
 
         # Plot each column's coordinates
@@ -267,7 +274,7 @@ class EmbeddingVisualizer:
             centroid = centroids.loc[column].values  # Extract centroid coordinates from DataFrame
             plt.scatter(centroid[0], centroid[1], color='red', s=50, edgecolor='black', marker='o', zorder=1)
 
-        # Set static x and y axis limits
+        # Set calculated x and y axis limits
         plt.xlim(x_lim)
         plt.ylim(y_lim)
 
@@ -286,8 +293,8 @@ class EmbeddingVisualizer:
 
         # Move the buffer cursor to the beginning
         buf.seek(0)
-
         return buf
+
 
     def plot_umap_3d(self, df, title=str(), save_path=None):
         fig = plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
