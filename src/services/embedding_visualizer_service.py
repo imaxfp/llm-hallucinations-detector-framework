@@ -1,3 +1,4 @@
+import io
 import logging
 import seaborn as sns
 import matplotlib.pyplot as plt  # You still need matplotlib as a backend
@@ -7,6 +8,7 @@ import warnings
 from sklearn.decomposition import PCA
 import umap as mp
 import ast
+from PIL import Image
 
 # Constants (adjusted for visibility and scaling)
 N_NEIGHBORS = 10  # Adjusted for better local/global balance
@@ -180,23 +182,63 @@ class EmbeddingVisualizer:
         
         return new_df
 
+
+    #TODO move it to separated function 
+    def plot_list_images_as_matrix(self, lines=3, columns=2, imgs = []):                
+        # Create a figure with high resolution
+        fig, axes = plt.subplots(lines, columns, figsize=(40, 20), dpi=100)  # Adjust figsize as needed
+
+        # Display images in high quality
+        for ax, img_buff in zip(axes.flatten(), imgs):
+            img = Image.open(img_buff)
+            ax.imshow(img)
+            ax.axis('off')  # Turn off axis for a cleaner look
+
+        # Adjust the spacing between images        
+        plt.subplots_adjust(wspace=0.1, hspace=0.1)  # Adjust space between images
+        plt.tight_layout()
+        plt.show()
+
+    def plot_average_similarities_result(self, title, average_distances: dict):        
+        df = pd.DataFrame(list(average_distances.items()), columns=['Key', 'Average Distance'])
+        df.index = range(1, len(df) + 1)  # Set index to start from 1
+        # Set up the figure and axis
+        fig, ax = plt.subplots(figsize=(8, len(df) * 0.5))
+        # Hide axes
+        ax.axis('off')
+
+        # Create the table, including the index as a separate column
+        table = ax.table(cellText=df.reset_index().values, colLabels=["Index", "Key", "Average Distance"],
+                        cellLoc='left', loc='center')
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.auto_set_column_width(col=list(range(len(df.columns) + 1)))  # +1 for the index column
+        table.scale(1.2, 1.2)  # Adjust scale for readability
+        plt.title(title, fontsize=14)
+        plt.show()    
     
     # TODO add t-SNE      
     #######
     # Plot UMAP 2D
     #######
-    def plot_umap_2d(self, df, centroids, title=str(), save_path=None, x_lim=(-40, 40), y_lim=(-40, 40)):
+    def plot_umap_2d(self, df, centroids, title=str(), x_lim=(-25, 25), y_lim=(-25, 25)):
         """
-        Plot UMAP 2D visualization with centroids marked as red dots.
+        Plot UMAP 2D visualization with centroids marked as red dots and return the plot as an image buffer.
         
         Args:
             df (pd.DataFrame): DataFrame with UMAP coordinates for each set.
             centroids (pd.DataFrame): DataFrame with centroids for each group.
             title (str): Title of the plot.
-            save_path (str): Path to save the plot.
             x_lim (tuple): Static x-axis limits.
             y_lim (tuple): Static y-axis limits.
+        
+        Returns:
+            io.BytesIO: In-memory image buffer containing the plot.
         """
+        # Create an in-memory buffer to store the image
+        buf = io.BytesIO()
+        
         plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
 
         # Get the number of columns in the DataFrame
@@ -238,11 +280,14 @@ class EmbeddingVisualizer:
         # Automatically adjust the layout
         plt.tight_layout()
         
-        # Save the plot to the specified path, if provided
-        if save_path:
-            plt.savefig(save_path)
-        # Show the plot
-        plt.show()
+        # Save the plot to the in-memory buffer
+        plt.savefig(buf, format='png')
+        plt.close()  # Close the plot to free memory
+
+        # Move the buffer cursor to the beginning
+        buf.seek(0)
+
+        return buf
 
     def plot_umap_3d(self, df, title=str(), save_path=None):
         fig = plt.figure(figsize=(10, 8))  # Adjust the figure size as needed
