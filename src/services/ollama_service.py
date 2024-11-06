@@ -2,7 +2,6 @@ import csv
 from typing import List
 import uuid
 import ollama
-import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
 import sys
@@ -18,6 +17,14 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # RUN the next models wiht OLLAMA - https://ollama.com/library
 #LLM_MODELS = {"llama3.1", "gemma2", "phi3"}
 LLM_MODELS = {"llama3.1"}
+
+#datasets column names
+UID_COLUMN = 'uid'
+QUESTION_COLUMN = 'question'
+TRUE_ANSWER_COLUMN = 'true_expected_long_answers'
+
+MIN_WORDS_IN_ANSW = 50
+MAX_WORDS_IN_ANSW = 70
 
 
 class QuestionEntity:
@@ -56,7 +63,8 @@ class OllamaChat:
             messages=[
                 {'role': 'system', 'content': 'You are a question-answer helper. Analyze the question and provide a concise answer.'},
                 {'role': 'system', 'content': role_prompt},
-                {'role': 'system', 'content': 'PAY ATTENTION YOUR Response have to be about 50 or 60 words.'},
+                {'role': 'system', 'content': f'PAY ATTENTION YOUR ANSWER, Response have to have MINIMUM {MIN_WORDS_IN_ANSW} words or MAXIMUM {MAX_WORDS_IN_ANSW} words.'},
+                {'role': 'system', 'content': f'Do no provide answer shorter than {MIN_WORDS_IN_ANSW} words, and longer than {MAX_WORDS_IN_ANSW} words'},
                 {'role': 'user', 'content': msg}
             ],
             stream=True
@@ -217,9 +225,9 @@ class NaturalQuestionsParser:
                 if stop_line is not None and i >= stop_line:
                     break
                 entity = QuestionEntity(
-                    uid=row['uid'],
-                    question=row['question'],
-                    true_answer=row['true_answer'],                    
+                    uid=row[UID_COLUMN],
+                    question=row[QUESTION_COLUMN],
+                    true_answer=row[TRUE_ANSWER_COLUMN],                    
                 )
                 entities.append(entity)
         return entities
@@ -236,7 +244,7 @@ class NaturalQuestionsParser:
             reader = csv.DictReader(file)
             fieldnames = reader.fieldnames  # Keep field names for rewriting
             for row in reader:
-                true_answer = row['true_answer']
+                true_answer = row[TRUE_ANSWER_COLUMN]
                 word_count = len(true_answer.split())
                 
                 # Check if true_answer is non-empty and has between 10 and 80 words
@@ -257,7 +265,7 @@ class NaturalQuestionsParser:
             return str(uuid.uuid4())
 
         # Apply UID generation where 'UID' column is NaN or empty
-        df['uid'] = df['uid'].apply(lambda x: generate_uid() if pd.isna(x) or x == '' else x)
+        df[UID_COLUMN] = df[UID_COLUMN].apply(lambda x: generate_uid() if pd.isna(x) or x == '' else x)
 
         # Save the updated dataframe back to CSV
         df.to_csv(self.file_path, index=False)
@@ -278,9 +286,9 @@ class NaturalQuestionsParser:
             all_true_answ_embedding_keys.update(entity.true_answer_embeddings.keys())
 
             row = {
-                "uid": entity.uid,
-                "question": entity.question,
-                "true_answer": entity.true_answer,
+                UID_COLUMN: entity.uid,
+                QUESTION_COLUMN: entity.question,
+                TRUE_ANSWER_COLUMN: entity.true_answer,
             }
 
             # Fill in the llm_answers for each key, if present
@@ -291,7 +299,7 @@ class NaturalQuestionsParser:
                 row[f"embedding_{emb_key}"] = entity.llm_embeddings.get(emb_key, "")
                 
             for emb_key in all_true_answ_embedding_keys:
-                row[f"true_answer_embedding_{emb_key}"] = entity.true_answer_embeddings.get(emb_key, "")
+                row[f"{TRUE_ANSWER_COLUMN}_embedding_{emb_key}"] = entity.true_answer_embeddings.get(emb_key, "")
             
             data.append(row)
 
@@ -304,7 +312,7 @@ class NaturalQuestionsParser:
             existing_df = pd.read_csv(res_file_path)
 
             # Merge new_df with existing_df on 'uid', giving priority to new_df values
-            combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=['uid'], keep='last')
+            combined_df = pd.concat([existing_df, new_df]).drop_duplicates(subset=[UID_COLUMN], keep='last')
         else:
             # If no file exists, just use the new dataframe
             combined_df = new_df
@@ -322,23 +330,23 @@ class NaturalQuestionsParser:
 
             for row in reader:
                 # Extract uid, question, and true_answer
-                uid = row['uid']
-                question = row['question']
-                true_answer = row['true_answer']
+                uid = row[UID_COLUMN]
+                question = row[QUESTION_COLUMN]
+                true_answer = row[TRUE_ANSWER_COLUMN]
 
                 # Create QuestionEntity instance
                 entity = QuestionEntity(uid, question, true_answer)
 
                 # Extract LLM answers, embeddings, and true answer embeddings
                 for key, value in row.items():
-                    if key not in ['uid', 'question', 'true_answer']:
+                    if key not in [UID_COLUMN, QUESTION_COLUMN, TRUE_ANSWER_COLUMN]:
                         if key.startswith('embedding_'):
                             # Store in llm_embeddings by removing the 'embedding_' prefix
                             emb_key = key[len('embedding_'):]
                             entity.llm_embeddings[emb_key] = value
-                        elif key.startswith('true_answer_embedding_'):
+                        elif key.startswith(f'{TRUE_ANSWER_COLUMN}_embedding_'):
                             # Store in true_answer_embeddings by removing the 'true_answer_embedding_' prefix
-                            emb_key = key[len('true_answer_embedding_'):]
+                            emb_key = key[len(f'{TRUE_ANSWER_COLUMN}_embedding_'):]
                             entity.true_answer_embeddings[emb_key] = value
                         else:
                             # Store in llm_answers
