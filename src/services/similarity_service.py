@@ -1,30 +1,13 @@
 import math
+import random
 import numpy as np
 import pandas as pd
 from typing import Dict, List
+import logging
+import pandas as pd 
+from src.services.embedding_visualizer_service import EmbeddingVisualizer
 
-
-def find_centroids(df):
-    """
-    Calculate the centroid for each column of coordinates in the DataFrame.
-
-    Args:
-        df (pd.DataFrame): DataFrame with columns representing UMAP coordinates for different sets.
-
-    Returns:
-        pd.DataFrame: DataFrame with only x, y coordinates for each centroid.
-    """
-    centroids = {}
-
-    for column in df.columns:
-        # Stack coordinates for each column and calculate the mean
-        coords = np.vstack(df[column].values)
-        centroids[column] = coords.mean(axis=0)  # Get the centroid as [x, y]
-
-    # Return a DataFrame with each row containing x, y for each centroid
-    centroids_df = pd.DataFrame(centroids).T  # Transpose to have columns as rows
-    centroids_df.columns = ['x', 'y']  # Name the columns for clarity
-    return centroids_df
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 def centroids_df_to_dict(df: pd.DataFrame) -> Dict[str, List[float]]:
@@ -69,3 +52,22 @@ def euclidean_distance_dots(dots: Dict[str, List[float]]) -> Dict[str, list[floa
             compar_dict[pair_key] = euclidean_distance(dots[point1], dots[point2])
     
     return compar_dict
+
+
+def mesure_similarity(vis: EmbeddingVisualizer, experiment = 2, print_data = 1, shape = ''):
+    logging.info(f"Data shape for similarity measurement = {shape}")        
+    euclidean_distances = {}
+    for i in range(experiment+1):
+        df_umap = vis.apply_umap(n_components=2, rand_state=random.randint(0, 10**9))
+        centroids_df = vis.find_centroids(df_umap)
+        centroids_dict = centroids_df_to_dict(centroids_df)
+        distance = euclidean_distance_dots(centroids_dict)
+
+        for k, v in distance.items(): 
+            tmp = euclidean_distances.get(k, [])
+            tmp.append(v)
+            euclidean_distances[k] = tmp
+        if i != 0 and i % print_data == 0:
+            #print results 
+            average_distances = {k: round(sum(v) / len(v), 4) for k, v in euclidean_distances.items()}
+            vis.plot_average_similarities_result(f'Data shape = {shape}, Random SEED generated {i} times. Mean calculation results:', average_distances)

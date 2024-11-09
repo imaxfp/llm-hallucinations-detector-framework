@@ -1,11 +1,9 @@
 import io
 import logging
-import seaborn as sns
 import matplotlib.pyplot as plt  # You still need matplotlib as a backend
 import numpy as np
 import pandas as pd
 import warnings
-from sklearn.decomposition import PCA
 import umap as mp
 import ast
 from PIL import Image
@@ -44,7 +42,7 @@ class EmbeddingVisualizer:
         logging.info(f"Columns: {self.df.columns}")        
         return self.df
 
-    
+    #TODO move me to the separated Embedding Service
     def convert_columns_to_float_arrays(self):                
         """Convert all columns of the DataFrame from string representations of lists to flat NumPy float arrays."""
         for col in self.df.columns:
@@ -120,70 +118,43 @@ class EmbeddingVisualizer:
                 logging.info(f"An error occurred: {e}")            
         return new_df
     
-
-    def process_embeddings_PCA(self, target_dim, df):
+    def find_centroids(self, df):        
         """
-        Reduce dimensionality of all columns in the provided DataFrame using PCA and return a new DataFrame.
-        Parameters:
-            target_dim (int): The target dimension for PCA.
-            df (pd.DataFrame): The DataFrame containing the embeddings (each cell containing an array).    
+        Calculate the centroid for each column of coordinates in the DataFrame.
+
+        Args:
+            df (pd.DataFrame): DataFrame with columns representing UMAP coordinates for different sets.
+
         Returns:
-            new_df (pd.DataFrame): A DataFrame containing the PCA-reduced embeddings with labeled columns.
-        ------------------------------------
-        Principal Component Analysis (PCA) is a dimensionality reduction technique that transforms 
-        a dataset to a lower-dimensional space while retaining as much variance as possible. 
-        Here's a breakdown of the PCA process:
-
-        1. **Standardize the Data**: Center the data by subtracting the mean of each feature. 
-        This ensures that all features have a mean of zero, which is essential for PCA to work effectively.
-        
-        2. **Compute the Covariance Matrix**: Calculate the covariance matrix of the standardized data.
-        The covariance matrix reveals the relationships between different features in terms of their variances 
-        and how they co-vary with each other.
-        
-        3. **Calculate Eigenvalues and Eigenvectors**: Decompose the covariance matrix to get eigenvalues and 
-        eigenvectors. Eigenvalues indicate the amount of variance captured by each principal component, 
-        while eigenvectors indicate the direction of each component in the original feature space.
-        
-        4. **Sort and Select Principal Components**: Sort the eigenvalues in descending order and select the top 
-        `target_dim` eigenvectors corresponding to the largest eigenvalues. These eigenvectors represent the 
-        directions (principal components) that capture the most variance in the data.
-        
-        5. **Project the Data**: Transform the original data onto the selected principal components to reduce its 
-        dimensionality. This results in a new representation of the data in a lower-dimensional space, where 
-        each dimension is a principal component capturing the maximum possible variance.
-        
-        This method allows us to capture the most important patterns in the data while reducing noise and 
-        computational complexity in higher-dimensional spaces.
-
-        Main Logic:
-        - Expand any list-like entries in the columns to separate dimensions.
-        - Apply PCA on the expanded DataFrame to reduce the data to the desired number of dimensions.
-        - Return a new DataFrame with the PCA-reduced embeddings.
+            pd.DataFrame: DataFrame with only x, y coordinates for each centroid.
         """
-        # Expand each list in the columns to separate columns for each dimension in the embeddings
-        expanded_df = pd.DataFrame()
+        centroids = {}
 
-        for col in df.columns:
-            # Expand each list-like cell in the column into separate columns
-            expanded_cols = pd.DataFrame(df[col].tolist(), index=df.index)
-            # Rename columns with original column name as prefix
-            expanded_cols.columns = [f"{col}_{i}" for i in range(expanded_cols.shape[1])]
-            expanded_df = pd.concat([expanded_df, expanded_cols], axis=1)
+        for column in df.columns:
+            # Stack coordinates for each column and calculate the mean
+            coords = np.vstack(df[column].values)
+            centroids[column] = coords.mean(axis=0)  # Get the centroid as [x, y]
 
-        # Apply PCA to reduce dimensions
-        pca = PCA(n_components=target_dim)
-        reduced_embeddings = pca.fit_transform(expanded_df.values)
-        
-        # Create a new DataFrame to hold the PCA results with meaningful column names
-        new_df = pd.DataFrame(reduced_embeddings, columns=[f"PCA_{i+1}" for i in range(target_dim)])
-        
-        logging.info(f"PCA applied. New DataFrame shape: {new_df.shape}")
-        
-        return new_df
-
-
-    #TODO move it to separated function 
+        # Return a DataFrame with each row containing x, y for each centroid
+        centroids_df = pd.DataFrame(centroids).T  # Transpose to have columns as rows
+        centroids_df.columns = ['x', 'y']  # Name the columns for clarity
+        return centroids_df
+    
+    
+    def apply_umap_generate_list_2d_imgs(self, amount_imgs=1):
+        imgs = []
+        df_umap = self.apply_umap(n_components=2, rand_state=42)
+        centroids_df = pd.DataFrame(columns=df_umap.columns)
+        for i in range(amount_imgs):    
+            df_umap = self.apply_umap(n_components=2, rand_state=i)
+            centroids_df = self.find_centroids(df_umap)
+            img_buff = self.plot_umap_2d(df=df_umap, 
+                 centroids=centroids_df, 
+                 title=f"True Answers VS LLMs answers and Hallucinations. Shape = {df_umap.shape}")
+            imgs.append(img_buff)    
+        return imgs    
+    
+    #TODO hold me in the Visual Service
     def plot_list_images_as_matrix(self, lines=3, columns=2, imgs = []):                
         # Create a figure with high resolution
         fig, axes = plt.subplots(lines, columns, figsize=(40, 20), dpi=100)  # Adjust figsize as needed

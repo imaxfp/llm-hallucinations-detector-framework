@@ -1,5 +1,5 @@
 import csv
-from typing import List
+from typing import Dict, List, Optional, Sequence
 import uuid
 import ollama
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -57,22 +57,20 @@ class OllamaChat:
     def __init__(self, model_names=LLM_MODELS):        
         self.model_names = model_names
 
-    def chat_with_ollama_with_prompt(self, model_name, role_prompt=None, msg=None):
-        stream = ollama.chat(
-            model=model_name,            
-            messages=[
-                {'role': 'system', 'content': 'You are a question-answer helper. Analyze the question and provide a concise answer.'},
-                {'role': 'system', 'content': role_prompt},
-                {'role': 'system', 'content': f'PAY ATTENTION YOUR ANSWER, Response have to have MINIMUM {MIN_WORDS_IN_ANSW} words or MAXIMUM {MAX_WORDS_IN_ANSW} words.'},
-                {'role': 'system', 'content': f'Do no provide answer shorter than {MIN_WORDS_IN_ANSW} words, and longer than {MAX_WORDS_IN_ANSW} words'},
-                {'role': 'user', 'content': msg}
-            ],
-            stream=True
-        )
-        res = []
-        for chunk in stream:
-            res.append(chunk['message']['content'])
-        return ''.join(res)
+    def chat_with_ollama_with_prompt(self, model_name, prompt=None, msg=None):
+            stream = ollama.chat(
+                model=model_name,            
+                messages=[                    
+                    {'role': 'system', 'content': prompt},
+                    {'role': 'system', 'content': 'Response have to be about 50 or 60 words.'},
+                    {'role': 'user', 'content': msg}
+                ],
+                stream=True
+            )
+            res = []
+            for chunk in stream:
+                res.append(chunk['message']['content'])
+            return ''.join(res)
     
     def text_to_embedding(self, model_name, txt):
         embed = ollama.embed(model=model_name, input=txt)
