@@ -70,4 +70,4 @@ def mesure_similarity(vis: EmbeddingVisualizer, experiment = 2, print_data = 1, 
         if i != 0 and i % print_data == 0:
             #print results 
             average_distances = {k: round(sum(v) / len(v), 4) for k, v in euclidean_distances.items()}
-            vis.plot_average_similarities_result(f'Data shape = {shape}, Random SEED generated {i} times. Mean calculation results:', average_distances)
+            vis.plot_average_similarities_result(f'Centroids average distances for different randomers initialisation. Steps = {i} .Test data shape = {shape}', average_distances)
