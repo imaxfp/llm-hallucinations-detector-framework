@@ -1,4 +1,6 @@
-TODO add description 
+# Hallucination detection in LLMs
+
+White paper - https://arxiv.org/pdf/2510.05189
 
 #### Setup env:
 
